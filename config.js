@@ -8,7 +8,8 @@ window.LAMP_CONFIG = {
     messagingSenderId: "457108279193",
     appId: "1:457108279193:web:97a8f89586e115f8840d08"
   },
-  // Free Google Gemini key for Explain / Ask / Scene / Nutshell / Quiz.
-  // Get one at https://aistudio.google.com/apikey and paste it between the quotes.
+  // Your private AI helper on Cloudflare (the Gemini key lives there, not here).
+  geminiProxy: "https://lampai.johncena131317.workers.dev",
+  // Leave this empty. Never put a key here: this file is public.
   geminiKey: ""
 };
