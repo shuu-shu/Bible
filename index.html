@@ -286,9 +286,9 @@ body.playing .actionbar{bottom:142px}
 .tr-btn .ds{font-size:13px;color:var(--chrome-muted);margin-top:2px}
 .ext{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .ext a{color:var(--gilt-soft);font-weight:600;font-size:14px;border:1px solid rgba(207,169,85,.3);border-radius:999px;padding:6px 12px;text-decoration:none}
-.set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.set-row{flex-wrap:wrap;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
 .set-row .l{font-weight:600}
-.seg{display:inline-flex;background:rgba(0,0,0,.25);border-radius:10px;padding:3px;gap:2px}
+.seg{flex-wrap:wrap;display:inline-flex;background:rgba(0,0,0,.25);border-radius:10px;padding:3px;gap:2px}
 .seg button{border:0;background:transparent;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;color:var(--chrome-muted)}
 .seg button.on{background:var(--gilt);color:#1a1408}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
@@ -958,6 +958,7 @@ function openStudy(tab){
   if (tab) studyTab=tab;
   if (studyTab==="explain" && !explainTarget) explainTarget={b:st.b,c:st.c,vs:[firstVisibleVerse()]};
   $("#study").classList.add("open"); $("#scrim").classList.add("show"); studyOpen=true;
+  prefetchChapter();
   document.querySelectorAll("#studyTabs .tab").forEach(t=>t.classList.toggle("on",t.dataset.t===studyTab));
   renderStudy();
 }
@@ -1060,6 +1061,10 @@ function openSettings(){
     h("div",{class:"set-row"},h("span",{class:"l",text:"Reading"}),seg([["book","Turn pages"],["scroll","Scroll"]],p.mode,v=>{p.mode=v;applySettings();relayout();saveProfile();})),
     h("div",{class:"set-row"},h("span",{class:"l",text:"Verse numbers"}),seg([["on","Show"],["off","Hide"]],p.nums?"on":"off",v=>{p.nums=v==="on";applySettings();relayout();saveProfile();}))
   );
+  if (SAMPLE){
+    w.append(h("div",{class:"set-row"},h("span",{class:"l",text:"Natural voice (Read it to me)"}),seg([...AI_VOICES,["off","Off"]],p.aiVoice||"Sulafat",v=>{ p.aiVoice=v; saveProfile(); if (v!=="off"){ stopHuman(); speakHuman("The Lord is my shepherd; I shall not want. He makes me lie down in green pastures.").catch(()=>toast("Natural voice isn't available right now.")); } })),
+      h("div",{class:"set-row"},h("span",{class:"l",text:"Natural voice speed"}),seg([["0.9","Slow"],["1","Normal"],["1.15","Brisk"]],String(p.aiRate||1),v=>{p.aiRate=+v;saveProfile();})));
+  }
   w.append(h("div",{class:"set-row"},h("span",{class:"l",text:"Narrator plays next chapter"}),seg([["on","On"],["off","Off"]],p.autoNext===false?"off":"on",v=>{p.autoNext=v==="on";saveProfile();})));
   if (Speech.engine==="web"){
     const sel=h("select",{id:"voiceSel",style:"max-width:200px;background:rgba(0,0,0,.25);color:var(--chrome-ink);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:7px"});
@@ -1080,13 +1085,18 @@ $("#setBtn").onclick=openSettings;
 /* ---------- AI (Google Gemini, free tier) ---------- */
 let SAMPLE=null;
 const CFG=window.LAMP_CONFIG||{};
-function geminiModels(){ const saved=(()=>{try{return localStorage.getItem("lampbible:model")}catch(e){return null}})(); const list=(CFG.geminiModels||["gemini-flash-latest","gemini-3.6-flash","gemini-3.5-flash-lite","gemini-flash-lite-latest","gemini-2.5-flash"]); return saved?[saved,...list.filter(m=>m!==saved)]:list; }
+function geminiModels(fast){ const k="lampbible:model:"+(fast?"fast":"smart"); const saved=(()=>{try{return localStorage.getItem(k)}catch(e){return null}})();
+  const list = fast ? (CFG.fastModels||["gemini-flash-lite-latest","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash-lite","gemini-flash-latest"])
+                    : (CFG.geminiModels||["gemini-flash-latest","gemini-3.6-flash","gemini-flash-lite-latest","gemini-2.5-flash"]);
+  return saved?[saved,...list.filter(m=>m!==saved)]:list; }
 async function gemini(input, opts={}){
   const contents = typeof input==="string" ? [{role:"user",parts:[{text:input}]}] : input.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
   const body={contents,generationConfig:{temperature:0.7,maxOutputTokens:2048}};
   if (opts.json) body.generationConfig.responseMimeType="application/json";
+  if (opts.fast) body.generationConfig.maxOutputTokens=1200;
   let lastErr={code:"error"};
-  for (const model of geminiModels()){
+  const models=geminiModels(opts.fast);
+  for (const model of models){
     let r;
     const url = CFG.geminiProxy ? `${CFG.geminiProxy.replace(/\/$/,"")}/?model=${encodeURIComponent(model)}` : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
     const headers = CFG.geminiProxy ? {"Content-Type":"application/json"} : {"Content-Type":"application/json","x-goog-api-key":CFG.geminiKey};
@@ -1097,7 +1107,7 @@ async function gemini(input, opts={}){
     if (r.status===429) throw {code:"rate_limited"};
     if (r.status===403) throw {code:"key"};
     if (!r.ok) { lastErr={code:"error"}; continue; }
-    try{ localStorage.setItem("lampbible:model",model); }catch(e){}
+    try{ localStorage.setItem("lampbible:model:"+(opts.fast?"fast":"smart"),model); }catch(e){}
     const reader=r.body.getReader(), dec=new TextDecoder(); let buf="", text="";
     for(;;){ const {done,value}=await reader.read(); if (done) break; buf+=dec.decode(value,{stream:true});
       let i; while((i=buf.indexOf("\n"))>=0){ const line=buf.slice(0,i).trim(); buf=buf.slice(i+1);
@@ -1109,19 +1119,45 @@ async function gemini(input, opts={}){
   }
   throw lastErr;
 }
-const aiCache=new Map();
+const AI_LS="lampbible:ai:v1";
+const aiCache=new Map((()=>{ try{ return JSON.parse(localStorage.getItem(AI_LS)||"[]"); }catch(e){ return []; } })());
+const aiPending=new Map();
+function persistAI(){ try{ const arr=[...aiCache.entries()].slice(-120); localStorage.setItem(AI_LS,JSON.stringify(arr)); }catch(e){ try{ localStorage.removeItem(AI_LS); }catch(_){} } }
+function chapText(d,c){ return ((d.BSB||d.WEB||[])[c-1]||[]).map((t,i)=>`${i+1} ${t}`).join(" ").slice(0,9000); }
+function scenePrompt(b,c,d){ const label=refLabel(b,c); const excerpt=((d.BSB||[])[c-1]||[]).slice(0,6).join(" ").slice(0,900); return `You are a warm, historically careful Bible guide. Set the scene for a reader about to read ${label}. Its opening (BSB): "${excerpt}"
+Keep every part SHORT and simple, but keep the key facts. Reply with ONLY JSON:
+{"headline":"3-6 vivid words","mood":"1-2 words","story":"2 short sentences on what led up to this chapter","where":"1 short sentence: the place and what it feels like","when":"1 short sentence: rough date and what's going on","who":[{"name":"","role":"3-6 words"}] (at most 4 people),"watchFor":["3 things to notice, under 8 words each"],"narration":"the same scene as one warm spoken passage of 60-90 words, written to be read aloud by a storyteller: natural sentences, no lists, no parentheses, no abbreviations"}`; }
+function quizPrompt(b,c,d){ const label=refLabel(b,c); const text=chapText(d,c); return `Write a friendly 4-question multiple-choice quiz on ${label} for a Christian reader who just read it. Mix facts from the text with one question on meaning. Base it only on this text (BSB): "${text}"
+Reply with ONLY JSON: {"questions":[{"q":"","options":["","","",""],"answer":0,"why":"one sentence, citing the verse number"}]}`; }
+function nutPrompt(b,c,d){ const label=refLabel(b,c); const text=chapText(d,c); return `Retell ${label} for a Christian reader who wants it easy to understand. Use only this text (BSB): "${text}"
+Reply with ONLY JSON: {"oneLine":"the chapter in one simple sentence","retell":"the chapter retold in plain, warm, modern words, like telling a friend, 90-140 words, in 2-3 short paragraphs separated by \\n\\n, faithful to the text","keyVerse":the number of the single most important verse,"takeaways":["3 short takeaways, under 12 words each"]}`; }
+/* warm up the chapter's AI pages in the background so they open instantly */
+function prefetchChapter(){
+  if (!SAMPLE || !st.data) return;
+  const b=st.b, c=st.c, d=st.data, label=refLabel(b,c);
+  [["nut:"+label,nutPrompt],["scene:"+label,scenePrompt],["quiz:"+label+":0",quizPrompt]].forEach(([k,f],i)=>{
+    if (aiCache.has(k)) return;
+    setTimeout(()=>{ askJSON(f(b,c,d),k,true).catch(()=>{}); }, 400+i*700);
+  });
+}
+
 function aiUnavailable(el){ el.append(h("p",{class:"muted",text:"The AI study features are turned off. Add your AI helper link to config.js to turn them on."})); }
 function parseJSON(t){
   t=t.replace(/```(?:json)?/g,"");
   const a=t.indexOf("{"), z=t.lastIndexOf("}");
   return JSON.parse(t.slice(a,z+1));
 }
-async function askJSON(prompt, key){
+async function askJSON(prompt, key, fast){
   if (key && aiCache.has(key)) return aiCache.get(key);
-  const r=await SAMPLE(prompt,{json:true});
-  const v=parseJSON(r.text);
-  if (key) aiCache.set(key,v);
-  return v;
+  if (key && aiPending.has(key)) return aiPending.get(key);
+  const job=(async()=>{
+    const r=await SAMPLE(prompt,{json:true,fast:!!fast});
+    const v=parseJSON(r.text);
+    if (key){ aiCache.delete(key); aiCache.set(key,v); persistAI(); }
+    return v;
+  })();
+  if (key){ aiPending.set(key,job); job.finally(()=>aiPending.delete(key)).catch(()=>{}); }
+  return job;
 }
 function aiError(el,e){
   const msg = e&&e.code==="rate_limited" ? "The free AI limit was hit for the moment. Wait a minute and try again." :
@@ -1173,7 +1209,7 @@ Reply with ONLY a JSON object, no markdown, with these fields:
  "reflect": "one personal reflection question"}
 Quote Scripture only from the BSB or KJV text above. Stay faithful to mainstream Christian scholarship; where Christians differ, say so briefly.`;
   let r;
-  try{ r=await askJSON(prompt,key); } catch(e){ ai.textContent=""; aiError(ai,e); ai.append(h("button",{class:"ghostbtn",onclick:()=>renderStudy()},"Try again")); return; }
+  try{ r=await askJSON(prompt,key,true); } catch(e){ ai.textContent=""; aiError(ai,e); ai.append(h("button",{class:"ghostbtn",onclick:()=>renderStudy()},"Try again")); return; }
   S.profile.st.studied["ex:"+label]=1; statsChanged();
   if (!studyOpen || explainTarget!==t) return;
   ai.textContent="";
@@ -1265,12 +1301,8 @@ async function renderScene(body){
   const run=async()=>{
     out.textContent="";
     if (!aiCache.has(key)) out.append(h("div",{class:"card"},h("div",{class:"skel"}),h("div",{class:"skel",style:"width:70%"}),h("div",{class:"skel",style:"width:85%"})));
-    const vs=(st.data.BSB||[])[c-1]||[];
-    const excerpt=vs.slice(0,6).join(" ").slice(0,900);
     let r;
-    try{ r=await askJSON(`You are a warm, historically careful Bible guide. Set the scene for a reader about to read ${label}. Its opening (BSB): "${excerpt}"
-Keep every part SHORT and simple, but keep the key facts. Reply with ONLY JSON:
-{"headline":"3-6 vivid words","mood":"1-2 words","story":"2 short sentences on what led up to this chapter","where":"1 short sentence: the place and what it feels like","when":"1 short sentence: rough date and what's going on","who":[{"name":"","role":"3-6 words"}] (at most 4 people),"watchFor":["3 things to notice, under 8 words each"],"narration":"the same scene as one warm spoken passage of 60-90 words, written to be read aloud by a storyteller: natural sentences, no lists, no parentheses, no abbreviations"}`, key); }
+    try{ r=await askJSON(scenePrompt(b,c,st.data), key, true); }
     catch(e){ out.textContent=""; aiError(out,e); out.append(h("button",{class:"ghostbtn",onclick:run},"Try again")); return; }
     out.textContent="";
     S.profile.st.studied["sc:"+label]=1; statsChanged();
@@ -1306,10 +1338,8 @@ async function renderQuiz(body){
   const run=async()=>{
     out.textContent="";
     if (!aiCache.has(key)) out.append(h("div",{class:"card"},h("div",{class:"skel"}),h("div",{class:"skel",style:"width:70%"})));
-    const text=((st.data.BSB||[])[c-1]||[]).map((t,i)=>`${i+1} ${t}`).join(" ").slice(0,9000);
     let r;
-    try{ r=await askJSON(`Write a friendly 4-question multiple-choice quiz on ${label} for a Christian reader who just read it. Mix facts from the text with one question on meaning. Base it only on this text (BSB): "${text}"
-Reply with ONLY JSON: {"questions":[{"q":"","options":["","","",""],"answer":0,"why":"one sentence, citing the verse number"}]}`, key); }
+    try{ r=await askJSON(quizPrompt(b,c,st.data), key, true); }
     catch(e){ out.textContent=""; aiError(out,e); out.append(h("button",{class:"ghostbtn",onclick:run},"Try again")); return; }
     out.textContent="";
     let score=0, answered=0; const qs=(r.questions||[]).slice(0,5);
@@ -1343,10 +1373,8 @@ async function renderNutshell(body){
   const run=async()=>{
     out.textContent="";
     if (!aiCache.has(key)) out.append(h("div",{class:"card"},h("div",{class:"skel"}),h("div",{class:"skel",style:"width:80%"}),h("div",{class:"skel",style:"width:65%"})));
-    const text=((st.data.BSB||st.data.WEB||[])[c-1]||[]).map((t,i)=>`${i+1} ${t}`).join(" ").slice(0,9000);
     let r;
-    try{ r=await askJSON(`Retell ${label} for a Christian reader who wants it easy to understand. Use only this text (BSB): "${text}"
-Reply with ONLY JSON: {"oneLine":"the chapter in one simple sentence","retell":"the chapter retold in plain, warm, modern words, like telling a friend, 90-140 words, in 2-3 short paragraphs separated by \\n\\n, faithful to the text","keyVerse":the number of the single most important verse,"takeaways":["3 short takeaways, under 12 words each"]}`, key); }
+    try{ r=await askJSON(nutPrompt(b,c,st.data), key, true); }
     catch(e){ out.textContent=""; aiError(out,e); out.append(h("button",{class:"ghostbtn",onclick:run},"Try again")); return; }
     out.textContent="";
     S.profile.st.studied["nut:"+label]=1; statsChanged();
@@ -1551,14 +1579,72 @@ const Speech={ engine:null, onLine:null, _rej:null,
       next();
     });
   },
-  stop(){ if (this.engine==="web"){ const r=this._rej; this._rej=null; try{speechSynthesis.cancel();}catch(e){} if (r) r({code:"stopped"}); } }
+  stop(){ stopHuman(); if (this.engine==="web"){ const r=this._rej; this._rej=null; try{speechSynthesis.cancel();}catch(e){} if (r) r({code:"stopped"}); } }
 };
 const OSIS=["Gen","Exod","Lev","Num","Deut","Josh","Judg","Ruth","1Sam","2Sam","1Kgs","2Kgs","1Chr","2Chr","Ezra","Neh","Esth","Job","Ps","Prov","Eccl","Song","Isa","Jer","Lam","Ezek","Dan","Hos","Joel","Amos","Obad","Jonah","Mic","Nah","Hab","Zeph","Hag","Zech","Mal","Matt","Mark","Luke","John","Acts","Rom","1Cor","2Cor","Gal","Eph","Phil","Col","1Thess","2Thess","1Tim","2Tim","Titus","Phlm","Heb","Jas","1Pet","2Pet","1John","2John","3John","Jude","Rev"];
 function bhSlug(b){ const n=BOOKS[b][1].toLowerCase(); return n==="song of solomon"?"songs":n.replace(/ /g,"_"); }
 function narratorURL(b,c){ return S.profile.tr==="KJV" ? `https://www.biblegateway.com/audio/mclean/kjv/${OSIS[b]}.${c}` : `https://biblehub.com/audio/souer/${bhSlug(b)}/${c}.htm`; }
 function narratorLabel(){ return S.profile.tr==="KJV" ? "the KJV read by Max McLean" : "the Berean Standard Bible read by Bob Souer"; }
+/* ---------- natural AI voice (Gemini text-to-speech, through your private helper) ---------- */
+const HV={audio:new Audio(), token:0, cache:new Map(), done:null};
+const AI_VOICES=[["Sulafat","Warm"],["Kore","Calm"],["Charon","Deep"],["Puck","Bright"],["Aoede","Gentle"]];
+function pcmToWav(chunks, rate){
+  const len=chunks.reduce((a,c)=>a+c.length,0); const buf=new ArrayBuffer(44+len); const v=new DataView(buf); let o=0;
+  const str=t=>{ for(let i=0;i<t.length;i++) v.setUint8(o++,t.charCodeAt(i)); };
+  str("RIFF"); v.setUint32(o,36+len,true); o+=4; str("WAVEfmt "); v.setUint32(o,16,true); o+=4; v.setUint16(o,1,true); o+=2; v.setUint16(o,1,true); o+=2;
+  v.setUint32(o,rate,true); o+=4; v.setUint32(o,rate*2,true); o+=4; v.setUint16(o,2,true); o+=2; v.setUint16(o,16,true); o+=2; str("data"); v.setUint32(o,len,true); o+=4;
+  const out=new Uint8Array(buf); chunks.forEach(c=>{ out.set(c,o); o+=c.length; });
+  return new Blob([buf],{type:"audio/wav"});
+}
+function ttsModels(){ return CFG.ttsModels||["gemini-3.1-flash-tts-preview","gemini-2.5-flash-preview-tts","gemini-flash-tts-latest"]; }
+async function ttsChunk(text){
+  const voice=S.profile.aiVoice||"Sulafat"; const ck=voice+"|"+text;
+  if (HV.cache.has(ck)) return HV.cache.get(ck);
+  const job=(async()=>{
+    const body={contents:[{role:"user",parts:[{text:"Read this aloud warmly and naturally, like a friend sharing a devotional, at a relaxed pace:\n\n"+text}]}],
+      generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}};
+    let saved=null; try{ saved=localStorage.getItem("lampbible:tts"); }catch(e){}
+    const models=saved?[saved,...ttsModels().filter(m=>m!==saved)]:ttsModels();
+    for (const model of models){
+      const url = CFG.geminiProxy ? `${CFG.geminiProxy.replace(/\/$/,"")}/?model=${encodeURIComponent(model)}` : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+      const headers = CFG.geminiProxy ? {"Content-Type":"application/json"} : {"Content-Type":"application/json","x-goog-api-key":CFG.geminiKey};
+      const r=await fetch(url,{method:"POST",headers,body:JSON.stringify(body)});
+      if (r.status===404||r.status===400) continue;
+      if (r.status===429) throw {code:"rate_limited"};
+      if (!r.ok) continue;
+      const raw=await r.text(); const parts=[]; let rate=24000;
+      raw.split("\n").forEach(line=>{ line=line.trim(); if(!line.startsWith("data:")) return;
+        try{ const j=JSON.parse(line.slice(5)); ((j.candidates||[])[0]?.content?.parts||[]).forEach(p=>{ const d=p.inlineData; if (d&&d.data){ const m=/rate=(\d+)/.exec(d.mimeType||""); if(m) rate=+m[1]; const bin=atob(d.data); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); parts.push(u); } }); }catch(e){} });
+      if (!parts.length) continue;
+      try{ localStorage.setItem("lampbible:tts",model); }catch(e){}
+      return URL.createObjectURL(pcmToWav(parts,rate));
+    }
+    throw {code:"no_tts"};
+  })();
+  HV.cache.set(ck,job); job.catch(()=>HV.cache.delete(ck));
+  return job;
+}
+function splitForSpeech(text){
+  const out=[]; let buf="";
+  String(text).split(/\n+/).forEach(par=>{ (par.match(/[^.!?]+[.!?"”’]*\s*/g)||[par]).forEach(sn=>{ if ((buf+sn).length>650 && buf){ out.push(buf.trim()); buf=""; } buf+=sn; }); buf+="\n"; });
+  if (buf.trim()) out.push(buf.trim()); return out;
+}
+async function speakHuman(text, onStart){
+  const tok=++HV.token; const chunks=splitForSpeech(text); if (!chunks.length) return;
+  let next=ttsChunk(chunks[0]);
+  for (let i=0;i<chunks.length;i++){
+    const url=await next; if (tok!==HV.token) return;
+    if (i+1<chunks.length) next=ttsChunk(chunks[i+1]);
+    if (i===0 && onStart) onStart();
+    HV.audio.src=url; HV.audio.playbackRate=S.profile.aiRate||1;
+    await new Promise((res)=>{ HV.done=res; HV.audio.onended=res; HV.audio.onerror=res; HV.audio.play().catch(res); });
+    if (tok!==HV.token) return;
+  }
+}
+function stopHuman(){ HV.token++; try{ HV.audio.pause(); }catch(e){} if (HV.done){ const d=HV.done; HV.done=null; d(); } }
+
 function listenBtn(getText,label,cls){
-  if (!Speech.engine) return null;
+  if (!Speech.engine && !SAMPLE) return null;
   const b=h("button",{class:cls||"ghostbtn"},label);
   b.onclick=async()=>{
     if (speakingBtn===b){ Speech.stop(); return; }
@@ -1566,9 +1652,16 @@ function listenBtn(getText,label,cls){
     if (narr) AUD.pause();
     const prev=speakingBtn; speakingBtn=b; if (prev) prev.textContent=prev.dataset.l;
     b.dataset.l=label; b.textContent="■ Stop";
-    const lines=String(getText()).split(/\n+/).map(t=>t.trim()).filter(Boolean).map(t=>({text:t}));
+    const full=String(getText());
+    const lines=full.split(/\n+/).map(t=>t.trim()).filter(Boolean).map(t=>({text:t}));
     Speech.onLine=null;
-    try{ await Speech.speak(lines); }catch(e){ if (e&&e.code==="not_granted") toast("Read-aloud was turned off for this page."); }
+    let usedHuman=false;
+    if (SAMPLE && S.profile.aiVoice!=="off"){
+      b.textContent="… Getting voice ready";
+      try{ await speakHuman(full,()=>{ if (speakingBtn===b) b.textContent="■ Stop"; }); usedHuman=true; }
+      catch(e){ if (speakingBtn===b){ toast(e&&e.code==="rate_limited"?"Natural voice limit hit for now. Using your phone's voice.":"Natural voice isn't available right now. Using your phone's voice."); b.textContent="■ Stop"; } }
+    }
+    if (!usedHuman && speakingBtn===b){ try{ await Speech.speak(lines); }catch(e){} }
     if (speakingBtn===b){ speakingBtn=null; b.textContent=label; }
   };
   return b;
