@@ -1087,7 +1087,9 @@ async function gemini(input, opts={}){
   let lastErr={code:"error"};
   for (const model of geminiModels()){
     let r;
-    try{ r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":CFG.geminiKey},body:JSON.stringify(body)}); }
+    const url = CFG.geminiProxy ? `${CFG.geminiProxy.replace(/\/$/,"")}/?model=${encodeURIComponent(model)}` : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+    const headers = CFG.geminiProxy ? {"Content-Type":"application/json"} : {"Content-Type":"application/json","x-goog-api-key":CFG.geminiKey};
+    try{ r=await fetch(url,{method:"POST",headers,body:JSON.stringify(body)}); }
     catch(e){ throw {code:"network"}; }
     if (r.status===400){ const t=await r.text().catch(()=>""); if (/API key/i.test(t)) throw {code:"key"}; lastErr={code:"model"}; continue; }
     if (r.status===404){ lastErr={code:"model"}; continue; }
@@ -1107,7 +1109,7 @@ async function gemini(input, opts={}){
   throw lastErr;
 }
 const aiCache=new Map();
-function aiUnavailable(el){ el.append(h("p",{class:"muted",text:"The AI study features are turned off. Add a free Google Gemini key in config.js to turn them on (see SETUP.md)."})); }
+function aiUnavailable(el){ el.append(h("p",{class:"muted",text:"The AI study features are turned off. Add your AI helper link to config.js to turn them on."})); }
 function parseJSON(t){
   t=t.replace(/```(?:json)?/g,"");
   const a=t.indexOf("{"), z=t.lastIndexOf("}");
@@ -1640,7 +1642,7 @@ vp.addEventListener("scroll",()=>{ if (S.profile.mode==="scroll"){ clearTimeout(
   if (document.fonts && document.fonts.ready) { try{ await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,1500))]); }catch(e){} }
   await openChapter(S.profile.b, S.profile.c, {verse:S.profile.v||1});
   if (document.fonts) document.fonts.ready.then(()=>{ if (st.data) relayout(); });
-  if (CFG.geminiKey) SAMPLE=gemini;
+  if (CFG.geminiProxy || CFG.geminiKey) SAMPLE=gemini;
   if ("speechSynthesis" in window){ Speech.engine="web"; try{ speechSynthesis.getVoices(); speechSynthesis.addEventListener&&speechSynthesis.addEventListener("voiceschanged",()=>{}); }catch(e){} $("#listenBtn").hidden=false; }
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
