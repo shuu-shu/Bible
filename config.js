@@ -10,5 +10,5 @@ window.LAMP_CONFIG = {
   },
   // Free Google Gemini key for Explain / Ask / Scene / Nutshell / Quiz.
   // Get one at https://aistudio.google.com/apikey and paste it between the quotes.
-  geminiKey: ""
+  geminiKey: "AQ.Ab8RN6LPIuPSKX-06sqcpGt26IoUchlrozNWEXh0SLdm96US6g"
 };
