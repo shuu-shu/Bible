@@ -1062,7 +1062,7 @@ function openSettings(){
     h("div",{class:"set-row"},h("span",{class:"l",text:"Verse numbers"}),seg([["on","Show"],["off","Hide"]],p.nums?"on":"off",v=>{p.nums=v==="on";applySettings();relayout();saveProfile();}))
   );
   if (SAMPLE){
-    w.append(h("div",{class:"set-row"},h("span",{class:"l",text:"Natural voice (Read it to me)"}),seg([...AI_VOICES,["off","Off"]],p.aiVoice||"Sulafat",v=>{ p.aiVoice=v; saveProfile(); if (v!=="off"){ stopHuman(); speakHuman("The Lord is my shepherd; I shall not want. He makes me lie down in green pastures.").catch(()=>toast("Natural voice isn't available right now.")); } })),
+    w.append(h("div",{class:"set-row"},h("span",{class:"l",text:"Natural voice (Read it to me)"}),seg([...AI_VOICES,["off","Off"]],p.aiVoice||"Sulafat",v=>{ p.aiVoice=v; saveProfile(); if (v!=="off"){ stopHuman(); speakHuman("The Lord is my shepherd; I shall not want. He makes me lie down in green pastures.").catch(()=>showVoiceErr()); } })),
       h("div",{class:"set-row"},h("span",{class:"l",text:"Natural voice speed"}),seg([["0.9","Slow"],["1","Normal"],["1.15","Brisk"]],String(p.aiRate||1),v=>{p.aiRate=+v;saveProfile();})));
   }
   w.append(h("div",{class:"set-row"},h("span",{class:"l",text:"Narrator plays next chapter"}),seg([["on","On"],["off","Off"]],p.autoNext===false?"off":"on",v=>{p.autoNext=v==="on";saveProfile();})));
@@ -1077,7 +1077,7 @@ function openSettings(){
       h("p",{class:"muted",style:"font-size:13px;margin-top:10px",text:"These are your phone's own voices, used for the Listen buttons. Voices marked ★ sound the most natural. For a much more human voice on iPhone: Settings › Accessibility › Spoken Content › Voices › English, then download a voice marked Premium or Enhanced (Ava or Zoe are great). On Android: Settings › Text-to-speech › Google, then install a high-quality voice. Come back and pick it here. To hear the whole chapter read by a real person, tap Narrator."}));
   }
 
-  w.append(h("p",{class:"muted",style:"margin-top:14px",text: syncNote==="synced" ? "Your highlights, notes and place are saved to your account, so they follow you to your phone and computer." : "Your highlights and notes are saved in this browser. Sign in with Google to sync them across devices and join the leaderboard."}));
+  w.append(h("p",{class:"muted",style:"margin-top:14px;font-size:12px",text:"App version 4"}), h("p",{class:"muted",style:"margin-top:6px",text: syncNote==="synced" ? "Your highlights, notes and place are saved to your account, so they follow you to your phone and computer." : "Your highlights and notes are saved in this browser. Sign in with Google to sync them across devices and join the leaderboard."}));
   openModal("Reading settings", w, true);
 }
 $("#setBtn").onclick=openSettings;
@@ -1093,7 +1093,7 @@ async function gemini(input, opts={}){
   const contents = typeof input==="string" ? [{role:"user",parts:[{text:input}]}] : input.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
   const body={contents,generationConfig:{temperature:0.7,maxOutputTokens:2048}};
   if (opts.json) body.generationConfig.responseMimeType="application/json";
-  if (opts.fast) body.generationConfig.maxOutputTokens=1200;
+  body.generationConfig.maxOutputTokens=8192;
   let lastErr={code:"error"};
   const models=geminiModels(opts.fast);
   for (const model of models){
@@ -1151,8 +1151,9 @@ async function askJSON(prompt, key, fast){
   if (key && aiCache.has(key)) return aiCache.get(key);
   if (key && aiPending.has(key)) return aiPending.get(key);
   const job=(async()=>{
-    const r=await SAMPLE(prompt,{json:true,fast:!!fast});
-    const v=parseJSON(r.text);
+    let v;
+    try{ const r=await SAMPLE(prompt,{json:true,fast:!!fast}); v=parseJSON(r.text); }
+    catch(e){ if (!fast || (e&&e.code)) throw e; const r=await SAMPLE(prompt,{json:true,fast:false}); v=parseJSON(r.text); }
     if (key){ aiCache.delete(key); aiCache.set(key,v); persistAI(); }
     return v;
   })();
@@ -1608,14 +1609,13 @@ async function ttsChunk(text){
     for (const model of models){
       const url = CFG.geminiProxy ? `${CFG.geminiProxy.replace(/\/$/,"")}/?model=${encodeURIComponent(model)}` : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
       const headers = CFG.geminiProxy ? {"Content-Type":"application/json"} : {"Content-Type":"application/json","x-goog-api-key":CFG.geminiKey};
-      const r=await fetch(url,{method:"POST",headers,body:JSON.stringify(body)});
-      if (r.status===404||r.status===400) continue;
-      if (r.status===429) throw {code:"rate_limited"};
-      if (!r.ok) continue;
+      let r; try{ r=await fetch(url,{method:"POST",headers,body:JSON.stringify(body)}); }catch(e){ HV.lastErr="network: couldn't reach the AI helper"; continue; }
+      if (!r.ok){ let t=""; try{ t=await r.text(); }catch(e){} let m=t; try{ m=JSON.parse(t).error.message; }catch(e){} HV.lastErr=`${r.status} ${String(m).slice(0,140)}`;
+        if (r.status===429){ HV.lastErr="free daily voice limit reached"; throw {code:"rate_limited"}; } continue; }
       const raw=await r.text(); const parts=[]; let rate=24000;
       raw.split("\n").forEach(line=>{ line=line.trim(); if(!line.startsWith("data:")) return;
         try{ const j=JSON.parse(line.slice(5)); ((j.candidates||[])[0]?.content?.parts||[]).forEach(p=>{ const d=p.inlineData; if (d&&d.data){ const m=/rate=(\d+)/.exec(d.mimeType||""); if(m) rate=+m[1]; const bin=atob(d.data); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); parts.push(u); } }); }catch(e){} });
-      if (!parts.length) continue;
+      if (!parts.length){ HV.lastErr="no audio came back from "+model; continue; }
       try{ localStorage.setItem("lampbible:tts",model); }catch(e){}
       return URL.createObjectURL(pcmToWav(parts,rate));
     }
@@ -1641,6 +1641,10 @@ async function speakHuman(text, onStart){
     if (tok!==HV.token) return;
   }
 }
+function showVoiceErr(){
+  const w=h("div"); w.append(h("p",{style:"margin:0 0 8px",text:"The natural voice didn't work, so your phone's voice is reading instead. Send this to whoever set up the app:"}),h("p",{class:"muted",style:"font-family:monospace;font-size:13px;word-break:break-word",text:HV.lastErr||"unknown error"}));
+  openModal("Natural voice", w, true);
+}
 function stopHuman(){ HV.token++; try{ HV.audio.pause(); }catch(e){} if (HV.done){ const d=HV.done; HV.done=null; d(); } }
 
 function listenBtn(getText,label,cls){
@@ -1659,7 +1663,7 @@ function listenBtn(getText,label,cls){
     if (SAMPLE && S.profile.aiVoice!=="off"){
       b.textContent="… Getting voice ready";
       try{ await speakHuman(full,()=>{ if (speakingBtn===b) b.textContent="■ Stop"; }); usedHuman=true; }
-      catch(e){ if (speakingBtn===b){ toast(e&&e.code==="rate_limited"?"Natural voice limit hit for now. Using your phone's voice.":"Natural voice isn't available right now. Using your phone's voice."); b.textContent="■ Stop"; } }
+      catch(e){ if (speakingBtn===b){ showVoiceErr(); b.textContent="■ Stop"; } }
     }
     if (!usedHuman && speakingBtn===b){ try{ await Speech.speak(lines); }catch(e){} }
     if (speakingBtn===b){ speakingBtn=null; b.textContent=label; }
