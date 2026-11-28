@@ -160,7 +160,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .pl-t{display:flex;justify-content:space-between;gap:8px;font-size:14px}.pl-t span{color:var(--chrome-muted);font-variant-numeric:tabular-nums;font-size:12px}
 .pl-bar{height:6px;border-radius:4px;background:rgba(255,255,255,.12);margin:6px 0 4px;cursor:pointer;overflow:hidden}.pl-bar i{display:block;height:100%;width:0;background:var(--gilt)}
 .pl-s{font-size:11px;color:var(--chrome-muted)}
-body.playing .actionbar{bottom:142px}
+body.playing:not(.plmin) .actionbar{bottom:142px}
+body.playing:not(.plmin) .stage{padding-bottom:84px}
+body.plmin #player{display:none}
+body.playing #narrBtn{color:var(--gilt-soft);border-color:rgba(207,169,85,.5);background:rgba(207,169,85,.14)}
+body.playing #narrBtn::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--gilt);margin-left:4px;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.25}}
 /* ---------- drawers / sheets ---------- */
 .scrim{position:fixed;inset:0;background:rgba(5,8,12,.5);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
 .scrim.show{opacity:1;pointer-events:auto}
@@ -298,6 +303,16 @@ body.playing .actionbar{bottom:142px}
 .row-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .danger{color:#f0a3a3}
 
+.grp{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:12px;margin-bottom:8px;padding:0 8px}
+.grp>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 6px;font-weight:700;font-family:var(--display);font-size:20px;color:var(--gilt-soft)}
+.grp>summary::-webkit-details-marker{display:none}
+.grp>summary::after{content:"▸";color:var(--chrome-muted);font-size:14px;margin-left:8px}
+.grp[open]>summary::after{content:"▾"}
+.grp .cnt{margin-left:auto;font-family:var(--ui);font-size:12px;color:var(--chrome-muted);background:rgba(255,255,255,.06);border-radius:999px;padding:2px 9px}
+.recolor{display:flex;align-items:center;gap:7px;margin:0 0 8px}
+.rc.dot{width:20px;height:20px;border:2px solid rgba(255,255,255,.15);padding:0;cursor:pointer}
+.rc.dot.on{border-color:#fff;box-shadow:0 0 0 2px var(--gilt)}
+.search{flex:1;min-width:150px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:var(--chrome-ink);padding:9px 12px;font:15px var(--ui)}
 /* leaderboard */
 .lb-row{display:grid;grid-template-columns:34px 36px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--leather-3);margin-bottom:8px;border:1px solid transparent}
 .lb-row.me{border-color:var(--gilt);background:rgba(207,169,85,.12)}
@@ -365,6 +380,7 @@ body.playing .actionbar{bottom:142px}
   <button class="pl-btn" id="plPlay" aria-label="Pause">❚❚</button>
   <div class="pl-info"><div class="pl-t"><b id="plTitle"></b><span id="plTime"></span></div><div class="pl-bar" id="plBar"><i id="plProg"></i></div><div class="pl-s">Read by Bob Souer · Berean Standard Bible</div></div>
   <button class="pl-btn sm" id="plRate" aria-label="Playback speed">1×</button>
+  <button class="pl-btn sm" id="plMin" aria-label="Minimize player" title="Minimize">▾</button>
   <button class="pl-btn sm" id="plClose" aria-label="Stop narration">✕</button>
 </div>
 <audio id="aud" preload="none"></audio>
@@ -418,7 +434,7 @@ body.playing .actionbar{bottom:142px}
 <div class="ver" id="ver" aria-hidden="true"></div>
 
 <script>
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 const BOOKS = [["GEN","Genesis",50,[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,38,18,34,24,20,67,34,35,46,22,35,43,55,32,20,31,29,43,36,30,23,23,57,38,34,34,28,34,31,22,33,26]],["EXO","Exodus",40,[22,25,22,31,23,30,25,32,35,29,10,51,22,31,27,36,16,27,25,26,36,31,33,18,40,37,21,43,46,38,18,35,23,35,35,38,29,31,43,38]],["LEV","Leviticus",27,[17,16,17,35,19,30,38,36,24,20,47,8,59,57,33,34,16,30,37,27,24,33,44,23,55,46,34]],["NUM","Numbers",36,[54,34,51,49,31,27,89,26,23,36,35,16,33,45,41,50,13,32,22,29,35,41,30,25,18,65,23,31,40,16,54,42,56,29,34,13]],["DEU","Deuteronomy",34,[46,37,29,49,33,25,26,20,29,22,32,32,18,29,23,22,20,22,21,20,23,30,25,22,19,19,26,68,29,20,30,52,29,12]],["JOS","Joshua",24,[18,24,17,24,15,27,26,35,27,43,23,24,33,15,63,10,18,28,51,9,45,34,16,33]],["JDG","Judges",21,[36,23,31,24,31,40,25,35,57,18,40,15,25,20,20,31,13,31,30,48,25]],["RUT","Ruth",4,[22,23,18,22]],["1SA","1 Samuel",31,[28,36,21,22,12,21,17,22,27,27,15,25,23,52,35,23,58,30,24,42,15,23,29,22,44,25,12,25,11,31,13]],["2SA","2 Samuel",24,[27,32,39,12,25,23,29,18,13,19,27,31,39,33,37,23,29,33,43,26,22,51,39,25]],["1KI","1 Kings",22,[53,46,28,34,18,38,51,66,28,29,43,33,34,31,34,34,24,46,21,43,29,53]],["2KI","2 Kings",25,[18,25,27,44,27,33,20,29,37,36,21,21,25,29,38,20,41,37,37,21,26,20,37,20,30]],["1CH","1 Chronicles",29,[54,55,24,43,26,81,40,40,44,14,47,40,14,17,29,43,27,17,19,8,30,19,32,31,31,32,34,21,30]],["2CH","2 Chronicles",36,[17,18,17,22,14,42,22,18,31,19,23,16,22,15,19,14,19,34,11,37,20,12,21,27,28,23,9,27,36,27,21,33,25,33,27,23]],["EZR","Ezra",10,[11,70,13,24,17,22,28,36,15,44]],["NEH","Nehemiah",13,[11,20,32,23,19,19,73,18,38,39,36,47,31]],["EST","Esther",10,[22,23,15,17,14,14,10,17,32,3]],["JOB","Job",42,[22,13,26,21,27,30,21,22,35,22,20,25,28,22,35,22,16,21,29,29,34,30,17,25,6,14,23,28,25,31,40,22,33,37,16,33,24,41,30,24,34,17]],["PSA","Psalms",150,[6,12,8,8,12,10,17,9,20,18,7,8,6,7,5,11,15,50,14,9,13,31,6,10,22,12,14,9,11,12,24,11,22,22,28,12,40,22,13,17,13,11,5,26,17,11,9,14,20,23,19,9,6,7,23,13,11,11,17,12,8,12,11,10,13,20,7,35,36,5,24,20,28,23,10,12,20,72,13,19,16,8,18,12,13,17,7,18,52,17,16,15,5,23,11,13,12,9,9,5,8,28,22,35,45,48,43,13,31,7,10,10,9,8,18,19,2,29,176,7,8,9,4,8,5,6,5,6,8,8,3,18,3,3,21,26,9,8,24,13,10,7,12,15,21,10,20,14,9,6]],["PRO","Proverbs",31,[33,22,35,27,23,35,27,36,18,32,31,28,25,35,33,33,28,24,29,30,31,29,35,34,28,28,27,28,27,33,31]],["ECC","Ecclesiastes",12,[18,26,22,16,20,12,29,17,18,20,10,14]],["SNG","Song of Solomon",8,[17,17,11,16,16,13,13,14]],["ISA","Isaiah",66,[31,22,26,6,30,13,25,22,21,34,16,6,22,32,9,14,14,7,25,6,17,25,18,23,12,21,13,29,24,33,9,20,24,17,10,22,38,22,8,31,29,25,28,28,25,13,15,22,26,11,23,15,12,17,13,12,21,14,21,22,11,12,19,12,25,24]],["JER","Jeremiah",52,[19,37,25,31,31,30,34,22,26,25,23,17,27,22,21,21,27,23,15,18,14,30,40,10,38,24,22,17,32,24,40,44,26,22,19,32,21,28,18,16,18,22,13,30,5,28,7,47,39,46,64,34]],["LAM","Lamentations",5,[22,22,66,22,22]],["EZK","Ezekiel",48,[28,10,27,17,17,14,27,18,11,22,25,28,23,23,8,63,24,32,14,49,32,31,49,27,17,21,36,26,21,26,18,32,33,31,15,38,28,23,29,49,26,20,27,31,25,24,23,35]],["DAN","Daniel",12,[21,49,30,37,31,28,28,27,27,21,45,13]],["HOS","Hosea",14,[11,23,5,19,15,11,16,14,17,15,12,14,16,9]],["JOL","Joel",3,[20,32,21]],["AMO","Amos",9,[15,16,15,13,27,14,17,14,15]],["OBA","Obadiah",1,[21]],["JON","Jonah",4,[17,10,10,11]],["MIC","Micah",7,[16,13,12,13,15,16,20]],["NAM","Nahum",3,[15,13,19]],["HAB","Habakkuk",3,[17,20,19]],["ZEP","Zephaniah",3,[18,15,20]],["HAG","Haggai",2,[15,23]],["ZEC","Zechariah",14,[21,13,10,14,11,15,14,23,17,12,17,14,9,21]],["MAL","Malachi",4,[14,17,18,6]],["MAT","Matthew",28,[25,23,17,25,48,34,29,34,38,42,30,50,58,36,39,28,27,35,30,34,46,46,39,51,46,75,66,20]],["MRK","Mark",16,[45,28,35,41,43,56,37,38,50,52,33,44,37,72,47,20]],["LUK","Luke",24,[80,52,38,44,39,49,50,56,62,42,54,59,35,35,32,31,37,43,48,47,38,71,56,53]],["JHN","John",21,[51,25,36,54,47,71,53,59,41,42,57,50,38,31,27,33,26,40,42,31,25]],["ACT","Acts",28,[26,47,26,37,42,15,60,40,43,48,30,25,52,28,41,40,34,28,41,38,40,30,35,27,27,32,44,31]],["ROM","Romans",16,[32,29,31,25,21,23,25,39,33,21,36,21,14,23,33,27]],["1CO","1 Corinthians",16,[31,16,23,21,13,20,40,13,27,33,34,31,13,40,58,24]],["2CO","2 Corinthians",13,[24,17,18,18,21,18,16,24,15,18,33,21,14]],["GAL","Galatians",6,[24,21,29,31,26,18]],["EPH","Ephesians",6,[23,22,21,32,33,24]],["PHP","Philippians",4,[30,30,21,23]],["COL","Colossians",4,[29,23,25,18]],["1TH","1 Thessalonians",5,[10,20,13,18,28]],["2TH","2 Thessalonians",3,[12,17,18]],["1TI","1 Timothy",6,[20,15,16,16,25,21]],["2TI","2 Timothy",4,[18,26,17,22]],["TIT","Titus",3,[16,15,15]],["PHM","Philemon",1,[25]],["HEB","Hebrews",13,[14,18,19,16,14,20,28,13,28,39,40,29,25]],["JAS","James",5,[27,26,18,17,20]],["1PE","1 Peter",5,[25,25,22,19,14]],["2PE","2 Peter",3,[21,22,18]],["1JN","1 John",5,[10,29,24,21,21]],["2JN","2 John",1,[13]],["3JN","3 John",1,[14]],["JUD","Jude",1,[25]],["REV","Revelation",22,[20,29,22,11,14,17,17,13,21,11,19,17,18,20,8,21,18,24,21,15,27,21]]];
 const TR = {
   BBE:{name:"Bible in Basic English",desc:"The easiest to read. Uses about 850 everyday words.",g:"Easiest to read"},
@@ -538,7 +554,7 @@ function computeStats(){
     saved, notes, studies:Object.keys(sx.studied||{}).length, quiz:Object.values(sx.quiz||{}).reduce((a,b)=>a+(+b||0),0), memorized:Object.keys(sx.memo||{}).length, books };
 }
 function scheduleBoard(){
-  if (!DBH||!UID||DBH_READONLY) return;
+  if (!DBH||!UID||DBH_READONLY||S.profile.hideBoard) return;
   clearTimeout(boardT);
   boardT=setTimeout(async()=>{
     const data={...computeStats(), nick:String(S.profile.nick||"").slice(0,24)};
@@ -564,6 +580,7 @@ setInterval(()=>{
   P.day.sec+=5; P.activeSec+=5;
   const id=BOOKS[st.b][0]+"."+st.c; P.chapSec[id]=(P.chapSec[id]||0)+5;
   if (++tickN%12===0) saveProfile(); else mirror();
+  tryAutoRead(false);
 },5000);
 
 async function connectDB(u){
@@ -588,9 +605,22 @@ async function connectDB(u){
     snap.docs.forEach(d=>{ const x=d.data(); if (!x) return;
       if (d.id==="profile") prof=x; else if (d.id.startsWith("hl_")) hl[x.key]=x; else if (d.id.startsWith("n_")) notes[x.id]=x; });
     const moved = prof && (prof.b!==S.profile.b || prof.c!==S.profile.c || prof.tr!==S.profile.tr);
+    const localP=JSON.parse(JSON.stringify(S.profile));
     if (prof) S.profile={...S.profile,...prof,cats:{...DEFAULT_CATS,...(prof.cats||{})}};
+    // keep progress made on this device as well as on others
+    S.profile.read={...(prof&&prof.read||{}),...(localP.read||{})};
+    const ls=localP.st||{}, rs=(prof&&prof.st)||{};
+    S.profile.st={...ST_DEF(),...rs, activeSec:Math.max(ls.activeSec||0,rs.activeSec||0), best:Math.max(ls.best||0,rs.best||0),
+      chapSec:{...(rs.chapSec||{}),...Object.fromEntries(Object.entries(ls.chapSec||{}).map(([k,v])=>[k,Math.max(v,(rs.chapSec||{})[k]||0)]))},
+      studied:{...(rs.studied||{}),...(ls.studied||{})}, memo:{...(rs.memo||{}),...(ls.memo||{})},
+      quiz:Object.fromEntries([...new Set([...Object.keys(rs.quiz||{}),...Object.keys(ls.quiz||{})])].map(k=>[k,Math.max((rs.quiz||{})[k]||0,(ls.quiz||{})[k]||0)])),
+      day:(ls.day&&rs.day&&ls.day.d===rs.day.d)?{d:ls.day.d,sec:Math.max(ls.day.sec,rs.day.sec)}:(rs.day&&rs.day.d>=(ls.day||{}).d?rs.day:ls.day)||{d:"",sec:0}};
+    if ((localP.streak||{}).last > ((prof&&prof.streak)||{}).last || ((localP.streak||{}).last===((prof&&prof.streak)||{}).last && (localP.streak.count||0)>(prof.streak.count||0))) S.profile.streak=localP.streak;
+    const bmk=new Set((S.profile.bookmarks||[]).map(x=>x.key+(x.page?"p":"")));
+    (localP.bookmarks||[]).forEach(x=>{ if (!bmk.has(x.key+(x.page?"p":""))) S.profile.bookmarks.push(x); });
     fixProfile();
-    S.hl=hl; S.notes=notes; mirror();
+    S.hl={...S.hl,...hl}; S.notes={...S.notes,...notes}; mirror();
+    dbWrite("profile", JSON.parse(JSON.stringify(S.profile)));
     applySettings();
     if (moved) await openChapter(S.profile.b,S.profile.c,{verse:S.profile.v||1});
     else decorate();
@@ -608,7 +638,12 @@ $("#authBtn").onclick=async()=>{
   if (!u){ try{ await FB.signIn(); }catch(e){ toast("Sign-in didn't finish. Try again."); } return; }
   const w=h("div");
   w.append(h("p",{style:"margin:0 0 6px;font-weight:700",text:u.displayName||"Signed in"}), h("p",{class:"muted",style:"margin:0 0 14px",text:(u.email||"")+" · your highlights, notes and stats sync to this account on every device."}),
-    h("div",{class:"row-btns"},h("button",{class:"ghostbtn danger",onclick:async()=>{ closeModal(); await FB.signOut(); toast("Signed out"); }},"Sign out")));
+    h("div",{class:"set-row"},h("span",{class:"l",text:"Show me on the leaderboard"}),seg([["on","Yes"],["off","No"]],S.profile.hideBoard?"off":"on",async v=>{
+      S.profile.hideBoard = v==="off"; saveProfile();
+      if (S.profile.hideBoard){ try{ await DBH.doc("board/"+UID).delete(); toast("Removed from the leaderboard"); }catch(e){ toast("Couldn't remove it. Try again."); } }
+      else { lastBoard=""; scheduleBoard(); toast("You'll show up on the leaderboard again"); }
+      renderJournalIfOpen(); })),
+    h("div",{class:"row-btns",style:"margin-top:12px"},h("button",{class:"ghostbtn danger",onclick:async()=>{ closeModal(); await FB.signOut(); toast("Signed out"); }},"Sign out")));
   openModal("Account", w, true);
 };
 window.addEventListener("fb-auth",e=>connectDB(e.detail));
@@ -713,7 +748,7 @@ function layout(){
 function colOfVerse(v){ const el=flow.querySelector(`.v[data-v="${v}"]`); if(!el) return 0; let c=Math.floor((el.offsetLeft+2)/st.step); return c; }
 function normCol(c){ c=Math.max(0,Math.min(c,st.cols-1)); if (st.spread) c-=c%2; return c; }
 function setCol(c){
-  st.col=normCol(c);
+  st.col=normCol(c); setTimeout(()=>tryAutoRead(false),0);
   if (S.profile.mode!=="scroll") flow.style.transform=`translateX(${-st.col*st.step}px)`;
   updateChrome();
 }
@@ -929,13 +964,21 @@ $("#ribbon").onclick=()=>{
   saveProfile(); updateChrome(); renderJournalIfOpen();
 };
 
-function markRead(e){
+function readNeed(){ const words=((st.data[S.profile.tr]||st.data.BSB||[])[st.c-1]||[]).join(" ").split(/\s+/).length; return Math.min(240,Math.max(20,Math.round(words/350*60))); }
+function atChapterEnd(){
+  if (S.profile.mode==="scroll") return vp.scrollTop+vp.clientHeight >= vp.scrollHeight-120;
+  const per=st.spread?2:1; return st.col+per >= st.cols;
+}
+/* counts the chapter automatically once you've reached its end and spent real time in it */
+function tryAutoRead(force){
+  if (!st.data) return;
   const id=BOOKS[st.b][0]+"."+st.c;
-  if (S.profile.read[id]){ delete S.profile.read[id]; saveProfile(); renderChapter(); layout(); setCol(st.col); return; }
-  const words=((st.data[S.profile.tr]||st.data.BSB||[])[st.c-1]||[]).join(" ").split(/\s+/).length;
-  const need=Math.min(240,Math.max(20,Math.round(words/350*60)));
-  const have=S.profile.st.chapSec[id]||0;
-  if (have<need){ toast(`Spend a little more time in this chapter first (about ${Math.max(5,need-have)} more seconds)`); return; }
+  if (S.profile.read[id]) return;
+  if (!force && !atChapterEnd()) return;
+  if ((S.profile.st.chapSec[id]||0) < readNeed()) return;
+  commitRead(id,null);
+}
+function commitRead(id, btn){
   S.profile.read[id]=today();
   const s=S.profile.streak, t=today();
   const y=new Date(); y.setDate(y.getDate()-1);
@@ -943,11 +986,19 @@ function markRead(e){
   if (s.last!==t){ s.count = s.last===ys ? s.count+1 : 1; s.last=t; }
   S.profile.st.best=Math.max(S.profile.st.best||0,s.count);
   saveProfile();
-  const r=e.target.getBoundingClientRect(); sparkle(r.left+r.width/2,r.top+r.height/2);
   const n=Object.keys(S.profile.read).length;
-  toast(`Chapter read · ${s.count}-day streak · ${n} of 1,189 chapters`);
-  e.target.textContent="✓ Read"; e.target.classList.add("done");
+  toast(`✓ ${refLabel(st.b,st.c)} read · ${s.count}-day streak · ${n} of 1,189 chapters`);
+  const mb=btn||document.getElementById("markRead"); if (mb){ mb.textContent="✓ Read"; mb.classList.add("done"); }
   renderJournalIfOpen();
+}
+function markRead(e){
+  const id=BOOKS[st.b][0]+"."+st.c;
+  if (S.profile.read[id]){ delete S.profile.read[id]; saveProfile(); renderChapter(); layout(); setCol(st.col); return; }
+  const need=readNeed();
+  const have=S.profile.st.chapSec[id]||0;
+  if (have<need){ toast(`Spend a little more time in this chapter first (about ${Math.max(5,need-have)} more seconds)`); return; }
+  const r=e.target.getBoundingClientRect(); sparkle(r.left+r.width/2,r.top+r.height/2);
+  commitRead(id,e.target);
 }
 
 /* ---------- drawers & modal ---------- */
@@ -1288,10 +1339,10 @@ async function sendAsk(q){
   const body=$("#studyBody"); body.textContent=""; renderAsk(body);
   const bubbles=body.querySelectorAll(".msg.a"); const live=bubbles[bubbles.length-1].querySelector(".txt");
   const sys=`You are a warm, wise, Bible-literate study companion inside a Bible reading app for a Christian reader. The reader is currently in ${refLabel(st.b,st.c)} (${S.profile.tr}).${ctxText?` They selected ${ctxLabel}: "${ctxText}".`:""}
-Answer clearly and kindly in plain language, in short paragraphs (no markdown headings, no tables). Cite Scripture references when helpful. When quoting Scripture, quote only public-domain translations (BSB, KJV, WEB, ASV). Where Christian traditions disagree, say so fairly. Keep answers under about 220 words unless asked for more.`;
+Answer clearly and kindly in plain language, in short paragraphs (no markdown headings, no tables). Cite Scripture references when helpful. When quoting Scripture, quote only public-domain translations (BSB, KJV, WEB, ASV). Where Christian traditions disagree, say so fairly. Keep answers under about 150 words unless asked for more. Get straight to the answer.`;
   const msgs=chatLog.slice(0,-1).map((m,i)=>({role:m.role,content: i===0? sys+"\n\nQuestion: "+m.content : m.content}));
   try{
-    const r=await SAMPLE(msgs,{cache:false,modelTier:"default",onText:({text})=>{ ans.content=text||"Thinking…"; live.textContent=ans.content; const sb=$("#studyBody"); sb.scrollTop=sb.scrollHeight; }});
+    const r=await SAMPLE(msgs,{cache:false,fast:true,onText:({text})=>{ ans.content=text||"Thinking…"; live.textContent=ans.content; const sb=$("#studyBody"); sb.scrollTop=sb.scrollHeight; }});
     ans.content=r.text; ans.done=true;
   }catch(e){ ans.content = e&&e.code==="rate_limited" ? "The free AI limit was hit for the moment. Try again in a minute." : "Something went wrong getting an answer. Try asking again."; ans.done=false; }
   askBusy=false;
@@ -1441,14 +1492,20 @@ function renderStudy(){
 }
 
 /* ---------- journal ---------- */
-let hlFilter="all";
+let hlFilter="all", hlView="cat", noteF="all", noteView="recent", noteQ="";
+const openGroups=new Set();
+const CAT_ORDER=["My notes","Prayer","Sermon","Questions","Life","Studies","Answers","Scenes"];
+function noteCat(n){ return (n.cat&&String(n.cat).trim()) || ({note:"My notes",explain:"Studies",ask:"Answers",scene:"Scenes"})[n.kind] || "My notes"; }
 function renderJournalIfOpen(){ if (journalOpen) renderJournal(); }
 function goKey(k){ const p=parseKey(k); closeAll(); openChapter(p.b,p.c,{verse:p.v,flash:true,dir:(p.b*1000+p.c)>=(st.b*1000+st.c)?1:-1}); }
 function renderJournal(){
   const body=$("#jBody"); body.textContent="";
   if (journalTab==="hl"){
+    const all=Object.values(S.hl).filter(x=>parseKey(x.key).b>=0);
+    body.append(h("div",{style:"display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"},
+      h("span",{class:"muted",text:`${all.length} highlight${all.length===1?"":"s"}`}),
+      seg([["cat","By category"],["book","By book"]],hlView,v=>{hlView=v;renderJournal();})));
     const f=h("div",{class:"filters"});
-    const all=Object.values(S.hl);
     f.append(h("button",{class:"fchip"+(hlFilter==="all"?" on":""),onclick:()=>{hlFilter="all";renderJournal();}},`All · ${all.length}`));
     COLORS.forEach(c=>{ const n=all.filter(x=>x.color===c).length; f.append(h("button",{class:"fchip"+(hlFilter===c?" on":""),onclick:()=>{hlFilter=c;renderJournal();}},h("span",{class:"dot "+c}),`${S.profile.cats[c]} · ${n}`)); });
     body.append(f);
@@ -1456,14 +1513,23 @@ function renderJournal(){
       const inp=h("input",{value:S.profile.cats[hlFilter],"aria-label":"Category name",maxlength:24,id:"catName"});
       body.append(h("div",{class:"cat-edit"},h("span",{class:"dot "+hlFilter}),h("span",{class:"muted",text:"Rename category:"}),inp,h("button",{class:"mini",onclick:()=>{ const v=inp.value.trim(); if(!v) return; S.profile.cats[hlFilter]=v; saveProfile(); renderJournal(); toast("Category renamed"); }},"Save")));
     }
-    const list=all.filter(x=>hlFilter==="all"||x.color===hlFilter).sort((a,b)=>b.t-a.t);
-    if (!list.length) body.append(h("div",{class:"empty"},h("div",{class:"big",text:"No highlights yet"}),"Tap any verse on the page, then pick a color. Each color is a category you can rename, like Promises or Prayer."));
-    list.forEach(x=>{ const p=parseKey(x.key); if (p.b<0) return;
-      body.append(h("div",{class:"item"},h("div",{class:"bar "+x.color}),
+    const list=all.filter(x=>hlFilter==="all"||x.color===hlFilter);
+    if (!list.length){ body.append(h("div",{class:"empty"},h("div",{class:"big",text:all.length?"Nothing in this category yet":"No highlights yet"}),"Tap any verse on the page, then pick a color. Each color is a category you can rename, like Promises or Prayer.")); return; }
+    const item=(x)=>{ const p=parseKey(x.key);
+      const recolor=h("div",{class:"recolor"},h("span",{class:"muted",style:"font-size:12px",text:"Move to:"}),...COLORS.map(c=>h("button",{class:"rc dot "+c+(x.color===c?" on":""),title:S.profile.cats[c],"aria-label":"Move to "+S.profile.cats[c],onclick:()=>{ if (x.color===c) return; setHL(x.key,c,x.text); decorate(); renderJournal(); toast("Moved to "+S.profile.cats[c]); }})));
+      return h("div",{class:"item"},h("div",{class:"bar "+x.color}),
         h("div",{class:"ttl"},h("span",{text:refLabel(p.b,p.c,p.v)}),h("span",{class:"k",text:S.profile.cats[x.color]+" · "+(x.tr||"")})),
-        h("div",{class:"txt",text:x.text||""}),
-        h("div",{class:"acts"},h("button",{class:"mini",onclick:()=>goKey(x.key)},"Go to verse"),h("button",{class:"mini",onclick:()=>{ explainTarget={b:p.b,c:p.c,vs:[p.v]}; openStudy("explain"); }},"✦ Explain"),h("button",{class:"mini",onclick:()=>openMemorize(x.key,x.text)},"Memorize"),h("button",{class:"mini",onclick:()=>{ setHL(x.key,null); decorate(); renderJournal(); }},"Remove"))));
-    });
+        h("div",{class:"txt",text:x.text||""}), recolor,
+        h("div",{class:"acts"},h("button",{class:"mini",onclick:()=>goKey(x.key)},"Go to verse"),h("button",{class:"mini",onclick:()=>{ explainTarget={b:p.b,c:p.c,vs:[p.v]}; openStudy("explain"); }},"✦ Explain"),h("button",{class:"mini",onclick:()=>openMemorize(x.key,x.text)},"Memorize"),h("button",{class:"mini",onclick:()=>{ setHL(x.key,null); decorate(); renderJournal(); }},"Remove"))); };
+    if (hlView==="book"){
+      const groups={}; list.forEach(x=>{ const b=parseKey(x.key).b; (groups[b]=groups[b]||[]).push(x); });
+      Object.keys(groups).map(Number).sort((a,b)=>a-b).forEach(b=>{
+        const g=groups[b].sort((x,y)=>{ const P=parseKey(x.key),Q=parseKey(y.key); return P.c-Q.c||P.v-Q.v; });
+        const d=h("details",{class:"grp",open:openGroups.has("h"+b)},h("summary",null,h("span",{text:BOOKS[b][1]}),h("span",{class:"cnt",text:g.length})));
+        d.addEventListener("toggle",()=>{ d.open?openGroups.add("h"+b):openGroups.delete("h"+b); });
+        g.forEach(x=>d.append(item(x))); body.append(d);
+      });
+    } else list.sort((a,b)=>b.t-a.t).forEach(x=>body.append(item(x)));
   } else if (journalTab==="bm"){
     const list=S.profile.bookmarks;
     if (!list.length) body.append(h("div",{class:"empty"},h("div",{class:"big",text:"No bookmarks yet"}),"Pull the red ribbon at the top of the page to save your place, or tap a verse and choose Bookmark."));
@@ -1474,17 +1540,40 @@ function renderJournal(){
         h("div",{class:"acts"},h("button",{class:"mini",onclick:()=>goKey(x.key)},x.page?"Open page":"Go to verse"),h("button",{class:"mini",onclick:()=>{ S.profile.bookmarks.splice(i,1); saveProfile(); decorate(); renderJournal(); }},"Remove"))));
     });
   } else if (journalTab==="notes"){
-    body.append(h("button",{class:"bigbtn",style:"margin-bottom:14px",onclick:()=>openNoteEditor({ref:keyOf(st.b,st.c,firstVisibleVerse()),refLabel:refLabel(st.b,st.c),title:"",body:""})},"+ New note"));
-    const list=Object.values(S.notes).sort((a,b)=>b.t-a.t);
-    if (!list.length) body.append(h("div",{class:"empty"},h("div",{class:"big",text:"Your notes live here"}),"Write your own thoughts, or tap “Save to notes” on any explanation, scene or answer."));
-    const kinds={note:"My note",explain:"Study",ask:"Answer",scene:"Scene"};
-    list.forEach(n=>{
-      body.append(h("div",{class:"item"},h("div",{class:"bar",style:`background:${n.kind==="note"?"#3c7c6a":"var(--gilt)"}`}),
-        h("div",{class:"ttl"},h("span",{text:n.title||"Untitled"}),h("span",{class:"k",text:kinds[n.kind]||"Note"})),
-        n.refLabel?h("div",{class:"muted",style:"font-size:12px;margin-top:2px",text:n.refLabel}):null,
-        h("div",{class:"txt",text:(n.body||"").length>320?(n.body.slice(0,320)+"…"):(n.body||"")}),
-        h("div",{class:"acts"},h("button",{class:"mini",onclick:()=>openNoteEditor(n)},"Open"),n.ref?h("button",{class:"mini",onclick:()=>goKey(n.ref)},"Go to verse"):null)));
-    });
+    body.append(h("button",{class:"bigbtn",style:"margin-bottom:12px",onclick:()=>openNoteEditor({ref:keyOf(st.b,st.c,firstVisibleVerse()),refLabel:refLabel(st.b,st.c),title:"",body:""})},"+ New note"));
+    const all=Object.values(S.notes);
+    if (!all.length){ body.append(h("div",{class:"empty"},h("div",{class:"big",text:"Your notes live here"}),"Write your own thoughts, or tap “Save to notes” on any explanation, scene or answer.")); return; }
+    const search=h("input",{id:"noteSearch",type:"search",placeholder:"Search your notes",value:noteQ,class:"search","aria-label":"Search notes"});
+    body.append(h("div",{style:"display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap"},search,seg([["recent","Recent"],["book","By book"]],noteView,v=>{noteView=v;renderJournal();})));
+    const kinds={note:"My notes",explain:"Studies",ask:"Answers",scene:"Scenes"};
+    const cats=[...new Set(all.map(n=>noteCat(n)))];
+    const f=h("div",{class:"filters"});
+    f.append(h("button",{class:"fchip"+(noteF==="all"?" on":""),onclick:()=>{noteF="all";renderJournal();}},`All · ${all.length}`));
+    cats.sort((a,b)=>CAT_ORDER.indexOf(a)-CAT_ORDER.indexOf(b)||a.localeCompare(b)).forEach(c=>{ const n=all.filter(x=>noteCat(x)===c).length; f.append(h("button",{class:"fchip"+(noteF===c?" on":""),onclick:()=>{noteF=c;renderJournal();}},`${c} · ${n}`)); });
+    body.append(f);
+    const listBox=h("div"); body.append(listBox);
+    const item=(n)=>h("div",{class:"item"},h("div",{class:"bar",style:`background:${n.kind==="note"?"#3c7c6a":"var(--gilt)"}`}),
+      h("div",{class:"ttl"},h("span",{text:n.title||"Untitled"}),h("span",{class:"k",text:noteCat(n)})),
+      n.refLabel?h("div",{class:"muted",style:"font-size:12px;margin-top:2px",text:n.refLabel+" · "+new Date(n.t||Date.now()).toLocaleDateString()}):null,
+      h("div",{class:"txt",text:(n.body||"").length>240?(n.body.slice(0,240)+"…"):(n.body||"")}),
+      h("div",{class:"acts"},h("button",{class:"mini",onclick:()=>openNoteEditor(n)},"Open"),n.ref?h("button",{class:"mini",onclick:()=>goKey(n.ref)},"Go to verse"):null));
+    const draw=()=>{
+      listBox.textContent="";
+      const q=noteQ.trim().toLowerCase();
+      const list=all.filter(n=>(noteF==="all"||noteCat(n)===noteF) && (!q || [n.title,n.body,n.refLabel,noteCat(n)].join(" ").toLowerCase().includes(q)));
+      if (!list.length){ listBox.append(h("div",{class:"empty",text:"No notes match."})); return; }
+      if (noteView==="book"){
+        const groups={}; list.forEach(n=>{ const b=n.ref?parseKey(n.ref).b:-1; (groups[b]=groups[b]||[]).push(n); });
+        Object.keys(groups).map(Number).sort((a,b)=>(a<0?999:a)-(b<0?999:b)).forEach(b=>{
+          const g=groups[b].sort((x,y)=>{ if(!x.ref||!y.ref) return y.t-x.t; const P=parseKey(x.ref),Q=parseKey(y.ref); return P.c-Q.c||P.v-Q.v; });
+          const d=h("details",{class:"grp",open:q||openGroups.has("n"+b)},h("summary",null,h("span",{text:b<0?"General":BOOKS[b][1]}),h("span",{class:"cnt",text:g.length})));
+          d.addEventListener("toggle",()=>{ d.open?openGroups.add("n"+b):openGroups.delete("n"+b); });
+          g.forEach(n=>d.append(item(n))); listBox.append(d);
+        });
+      } else list.sort((a,b)=>b.t-a.t).forEach(n=>listBox.append(item(n)));
+    };
+    search.addEventListener("input",()=>{ noteQ=search.value; draw(); });
+    draw();
   } else if (journalTab==="board"){
     renderBoard(body);
   } else {
@@ -1531,11 +1620,13 @@ function renderBoard(body){
   if (!boardRows){ body.append(h("div",{class:"card"},h("div",{class:"skel"}),h("div",{class:"skel",style:"width:70%"}))); return; }
   const [k,l,fmt]=STATS.find(x=>x[0]===boardStat);
   const rows=boardRows.map(r=>({...r}));
-  if (!rows.some(r=>r.id===UID)) rows.push({id:UID,...me,nick:S.profile.nick});
+  if (S.profile.hideBoard){ const i=rows.findIndex(r=>r.id===UID); if (i>=0) rows.splice(i,1); }
+  else if (!rows.some(r=>r.id===UID)) rows.push({id:UID,...me,nick:S.profile.nick});
   else rows.forEach(r=>{ if (r.id===UID) Object.assign(r,me,{nick:S.profile.nick}); });
   rows.sort((a,b)=>statVal(b,k)-statVal(a,k));
   const myRank=rows.findIndex(r=>r.id===UID)+1;
-  body.append(h("div",{class:"card",style:"display:flex;align-items:center;gap:12px"},
+  if (!myRank) body.append(h("p",{class:"muted",text:"You're hidden from the leaderboard. Tap your account circle at the top to show yourself again."}));
+  else body.append(h("div",{class:"card",style:"display:flex;align-items:center;gap:12px"},
     h("div",{style:"font-family:var(--display);font-size:40px;font-weight:700;color:var(--gilt-soft)",text:"#"+myRank}),
     h("div",null,h("div",{style:"font-weight:700",text:`You · ${l}`}),h("div",{class:"muted",text:`${fmt(statVal(rows[myRank-1],k))} · ${rows.length} reader${rows.length===1?"":"s"} on the board`}))));
   rows.slice(0,100).forEach((r,i)=>{
@@ -1551,17 +1642,22 @@ function renderBoard(body){
 
 function openNoteEditor(n){
   const isNew=!n.id;
-  const note={id:n.id||nid(),kind:n.kind||"note",title:n.title||"",body:n.body||"",ref:n.ref||null,refLabel:n.refLabel||"",t:n.t||Date.now()};
+  const note={id:n.id||nid(),kind:n.kind||"note",title:n.title||"",body:n.body||"",ref:n.ref||null,refLabel:n.refLabel||"",t:n.t||Date.now(),cat:n.cat||""};
   const w=h("div");
   if (n.quote) w.append(h("div",{class:"card"},h("h3",{text:note.refLabel}),h("p",{class:"scripture",text:n.quote})));
   else if (note.refLabel) w.append(h("p",{class:"muted",style:"margin:0 0 10px",text:"Linked to "+note.refLabel}));
   const ti=h("input",{id:"noteTitle",value:note.title,placeholder:"Title"});
   const bo=h("textarea",{id:"noteBody",placeholder:"What is God showing you here?"}); bo.value=note.body;
-  w.append(h("div",{class:"field"},h("label",{for:"noteTitle",text:"Title"}),ti),h("div",{class:"field"},h("label",{for:"noteBody",text:"Note"}),bo));
+  const curCat=noteCat(note);
+  const catOpts=[...new Set([...CAT_ORDER,...Object.values(S.notes).map(noteCat)])];
+  const ci=h("input",{id:"noteCat",value:curCat,list:"catList",maxlength:24});
+  const dl=h("datalist",{id:"catList"},...catOpts.map(c=>h("option",{value:c})));
+  const quick=h("div",{class:"chips",style:"margin-top:6px"},...["My notes","Prayer","Sermon","Questions","Life"].map(c=>h("button",{class:"fchip",type:"button",onclick:()=>{ ci.value=c; }},c)));
+  w.append(h("div",{class:"field"},h("label",{for:"noteTitle",text:"Title"}),ti),h("div",{class:"field"},h("label",{for:"noteCat",text:"Category"}),ci,dl,quick),h("div",{class:"field"},h("label",{for:"noteBody",text:"Note"}),bo));
   const btns=h("div",{class:"row-btns"});
   if (!isNew) btns.append(h("button",{class:"ghostbtn danger",onclick:()=>{ delNote(note.id); closeModal(); decorate(); renderJournalIfOpen(); toast("Note deleted"); }},"Delete"));
   btns.append(h("button",{class:"bigbtn",style:"width:auto;padding:10px 22px",onclick:()=>{
-    note.title=ti.value.trim()||(note.refLabel?note.refLabel+" note":"Untitled"); note.body=bo.value; note.t=Date.now();
+    note.title=ti.value.trim()||(note.refLabel?note.refLabel+" note":"Untitled"); note.body=bo.value; note.t=Date.now(); note.cat=ci.value.trim().slice(0,24);
     saveNote(note); closeModal(); decorate(); renderJournalIfOpen(); toast("Note saved");
   }},"Save note"));
   w.append(btns);
@@ -1707,7 +1803,7 @@ function playNarration(b,c){
   stopListening(); if (speakingBtn){ Speech.stop(); speakingBtn=null; }
   narr={b,c}; AUD.src=narrURL(b,c); AUD.playbackRate=S.profile.narrRate||1; 
   $("#plTitle").textContent=refLabel(b,c); $("#plTime").textContent="loading…"; $("#plProg").style.width="0";
-  $("#player").hidden=false; document.body.classList.add("playing");
+  $("#player").hidden=false; document.body.classList.add("playing"); if (S.profile.plMin) document.body.classList.add("plmin");
   AUD.play().catch(()=>{ $("#plTime").textContent="tap ▶ to play"; });
   if ("mediaSession" in navigator){ try{
     navigator.mediaSession.metadata=new MediaMetadata({title:refLabel(b,c),artist:"Bob Souer",album:"Berean Standard Bible"});
@@ -1716,8 +1812,13 @@ function playNarration(b,c){
   }catch(e){} }
   if (st.b!==b||st.c!==c) openChapter(b,c,{dir:(b*1000+c)>(st.b*1000+st.c)?1:-1});
 }
-function stopNarration(){ AUD.pause(); AUD.removeAttribute("src"); AUD.load(); narr=null; $("#player").hidden=true; document.body.classList.remove("playing"); }
-$("#narrBtn").onclick=()=>{ if (narr && narr.b===st.b && narr.c===st.c){ AUD.paused?AUD.play():AUD.pause(); } else playNarration(st.b,st.c); };
+function stopNarration(){ document.body.classList.remove("plmin"); AUD.pause(); AUD.removeAttribute("src"); AUD.load(); narr=null; $("#player").hidden=true; document.body.classList.remove("playing"); }
+function setPlMin(m){ document.body.classList.toggle("plmin",!!m); S.profile.plMin=!!m; mirror(); }
+$("#plMin").onclick=()=>{ setPlMin(true); toast("Narrator keeps playing. Tap the headphones to bring it back."); };
+$("#narrBtn").onclick=()=>{
+  if (narr && document.body.classList.contains("plmin")){ setPlMin(false); return; }
+  if (narr && narr.b===st.b && narr.c===st.c){ AUD.paused?AUD.play():AUD.pause(); } else playNarration(st.b,st.c);
+};
 $("#plPlay").onclick=()=>{ AUD.paused?AUD.play().catch(()=>{}):AUD.pause(); };
 $("#plClose").onclick=stopNarration;
 $("#plRate").onclick=()=>{ const rs=[1,1.25,1.5,0.85]; const i=(rs.indexOf(S.profile.narrRate||1)+1)%rs.length; S.profile.narrRate=rs[i]; AUD.playbackRate=rs[i]; $("#plRate").textContent=rs[i]+"×"; saveProfile(); };
@@ -1726,7 +1827,7 @@ AUD.addEventListener("play",()=>{ $("#plPlay").textContent="❚❚"; $("#plPlay"
 AUD.addEventListener("pause",()=>{ $("#plPlay").textContent="▶"; $("#plPlay").setAttribute("aria-label","Play"); });
 AUD.addEventListener("timeupdate",()=>{ if (!isFinite(AUD.duration)) return; $("#plProg").style.width=(AUD.currentTime/AUD.duration*100)+"%"; $("#plTime").textContent=fmtT(AUD.currentTime)+" / "+fmtT(AUD.duration); });
 AUD.addEventListener("error",()=>{ if (narr) $("#plTime").textContent="couldn't load audio"; });
-AUD.addEventListener("ended",()=>{ const n=narr&&nextChapter(narr.b,narr.c); if (n && S.profile.autoNext!==false) playNarration(n.b,n.c); else stopNarration(); });
+AUD.addEventListener("ended",()=>{ if (narr && narr.b===st.b && narr.c===st.c) tryAutoRead(true); const n=narr&&nextChapter(narr.b,narr.c); if (n && S.profile.autoNext!==false) playNarration(n.b,n.c); else stopNarration(); });
 
 /* ---------- keyboard & resize ---------- */
 document.addEventListener("keydown",e=>{
