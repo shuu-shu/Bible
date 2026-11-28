@@ -16,7 +16,7 @@ export default {
     const model = new URL(req.url).searchParams.get("model") || "";
     if (!/^[a-z0-9.\-]{3,60}$/.test(model)) return new Response("Bad model", { status: 400, headers: cors });
     const body = await req.text();
-    if (body.length > 60000) return new Response("Too long", { status: 413, headers: cors });
+    if (body.length > 8000000) return new Response("Too long", { status: 413, headers: cors });
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
